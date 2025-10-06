@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>象棋 (極簡版)</title>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            display: flex; 
+            flex-direction: column;
+            align-items: center; 
+            padding: 10px;
+        }
+        #info-panel {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin: 10px;
+            padding: 8px 16px;
+            border-radius: 5px;
+            color: white;
+        }
+        .board-container {
+            border: 2px solid black;
+        }
+        .board-table {
+            border-collapse: collapse;
+            background-color: #f3dcb6;
+        }
+        .board-table td {
+            width: 35px;
+            height: 35px;
+            border: 1px solid #a16207;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .river {
+            height: 40px;
+            font-size: 18px;
+            letter-spacing: 0.5em;
+            background-color: #eaddc3;
+        }
+        .piece.red { color: #ef4444; }
+        .piece.black { color: #1f2937; }
+        .selected { background-color: #fde047; }
+        .valid-move { background-color: #86efac; }
+        .is-check {
+            border: 3px solid #dc2626 !important;
+            border-radius: 50%;
+        }
+        #reset-button {
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 style="margin: 0;">象棋</h1>
+    <div id="info-panel"></div>
+    <div id="board-container"></div>
+    <button id="reset-button">重新開始</button>
+
+<script>
+    const boardContainer = document.getElementById('board-container');
+    const infoPanel = document.getElementById('info-panel');
+    const resetButton = document.getElementById('reset-button');
+
+    const PIECES = {
+        'k': { name: '將', color: 'black' }, 'g': { name: '士', color: 'black' }, 'e': { name: '象', color: 'black' },
+        'h': { name: '馬', color: 'black' }, 'r': { name: '車', color: 'black' }, 'c': { name: '包', color: 'black' },
+        'p': { name: '卒', color: 'black' },
+        'K': { name: '帥', color: 'red' },   'G': { name: '仕', color: 'red' },   'E': { name: '相', color: 'red' },
+        'H': { name: '馬', color: 'red' },   'R': { name: '俥', color: 'red' },   'C': { name: '炮', color: 'red' },
+        'P': { name: '兵', color: 'red' }
+    };
+
+    const initialBoard = [
+        ['r', 'h', 'e', 'g', 'k', 'g', 'e', 'h', 'r'],
+        [null, null, null, null, null, null, null, null, null],
+        [null, 'c', null, null, null, null, null, 'c', null],
+        ['p', null, 'p', null, 'p', null, 'p', null, 'p'],
+        [null, null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null, null],
+        ['P', null, 'P', null, 'P', null, 'P', null, 'P'],
+        [null, 'C', null, null, null, null, null, 'C', null],
+        [null, null, null, null, null, null, null, null, null],
+        ['R', 'H', 'E', 'G', 'K', 'G', 'E', 'H', 'R']
+    ];
+
+    let board = [];
+    let currentPlayer = 'red';
+    let selectedPiece = null;
+    let validMoves = [];
+    let isGameOver = false;
+
+    function initGame() {
+        board = JSON.parse(JSON.stringify(initialBoard));
+        currentPlayer = 'red';
+        selectedPiece = null;
+        validMoves = [];
+        isGameOver = false;
+        renderBoard();
+        updateInfoPanel();
+    }
+
+    function renderBoard() {
+        let table = document.createElement('table');
+        table.className = 'board-table';
+
+        for (let r = 0; r < 10; r++) {
+            // 插入楚河漢界
+            if (r === 5) {
+                let riverRow = table.insertRow();
+                let riverCell = riverRow.insertCell();
+                riverCell.colSpan = 9;
+                riverCell.className = 'river';
+                riverCell.innerHTML = '楚 河 漢 界';
+            }
+
+            let row = table.insertRow();
+            for (let c = 0; c < 9; c++) {
+                let cell = row.insertCell();
+                cell.dataset.r = r;
+                cell.dataset.c = c;
+                
+                const pieceId = board[r][c];
+                const pieceSpan = document.createElement('span');
+
+                if (pieceId) {
+                    const pieceInfo = PIECES[pieceId];
+                    pieceSpan.textContent = pieceInfo.name;
+                    pieceSpan.className = `piece ${pieceInfo.color}`;
+
+                    // 標示被將軍的將/帥
+                    const kingPos = findKing(pieceInfo.color, board);
+                    if (kingPos && pieceId.toLowerCase() === 'k' && isInCheck(pieceInfo.color, board)) {
+                        pieceSpan.classList.add('is-check');
+                    }
+                    cell.appendChild(pieceSpan);
+                } else {
+                    cell.innerHTML = '┼'; // 用符號表示交叉點
+                    cell.style.color = '#c9ab81';
+                }
+
+                // 標示選中的棋子
+                if (selectedPiece && selectedPiece.r === r && selectedPiece.c === c) {
+                    cell.classList.add('selected');
+                }
+
+                // 標示可移動位置
+                if (validMoves.some(move => move[0] === r && move[1] === c)) {
+                    cell.classList.add('valid-move');
+                }
+
+                cell.addEventListener('click', () => onSquareClick(r, c));
+            }
+        }
+        boardContainer.innerHTML = '';
+        boardContainer.appendChild(table);
+    }
+
+    function onSquareClick(r, c) {
+        if (isGameOver) return;
+
+        if (selectedPiece && validMoves.some(move => move[0] === r && move[1] === c)) {
+            movePiece(selectedPiece.r, selectedPiece.c, r, c);
+            return;
+        }
+
+        const pieceId = board[r][c];
+        if (pieceId && PIECES[pieceId].color === currentPlayer) {
+            selectedPiece = { r, c, id: pieceId, info: PIECES[pieceId] };
+            validMoves = getValidMoves(r, c, pieceId, board);
+        } else {
+            selectedPiece = null;
+            validMoves = [];
+        }
+        renderBoard();
+    }
+
+    function movePiece(fromR, fromC, toR, toC) {
+        board[toR][toC] = board[fromR][fromC];
+        board[fromR][fromC] = null;
+        selectedPiece = null;
+        validMoves = [];
+        currentPlayer = (currentPlayer === 'red') ? 'black' : 'red';
+        renderBoard();
+        updateInfoPanel();
+        checkGameState();
+    }
+
+    function updateInfoPanel() {
+        const playerText = currentPlayer === 'red' ? '紅方' : '黑方';
+        infoPanel.style.backgroundColor = currentPlayer === 'red' ? '#ef4444' : '#1f2937';
+        infoPanel.textContent = `輪到 ${playerText} 行棋`;
+        if (isInCheck(currentPlayer, board)) {
+            infoPanel.textContent += ' (將軍！)';
+        }
+    }
+
+    function checkGameState() {
+        if (!hasAnyValidMoves(currentPlayer, board)) {
+            isGameOver = true;
+            const opponentColor = currentPlayer === 'red' ? 'black' : 'red';
+            const opponentName = opponentColor === 'red' ? '紅方' : '黑方';
+            const currentPlayerName = currentPlayer === 'red' ? '紅方' : '黑方';
+            const reason = isInCheck(currentPlayer, board) ? '將死' : '困斃';
+            const message = reason === '將死' 
+                ? `${opponentName}獲勝！ (${reason})` 
+                : `和棋！ (${currentPlayerName}${reason})`;
+            
+            // 使用內建的 alert，最簡單可靠
+            setTimeout(() => {
+                alert(message);
+                infoPanel.textContent = "遊戲結束";
+            }, 100);
+        }
+    }
+
+    // --- 所有移動規則和判斷邏輯 (與之前版本相同) ---
+    function getValidMoves(r,c,p,b){const t=p.toLowerCase();let m=[];switch(t){case'k':m=getKingMoves(r,c,p,b);break;case'g':m=getGuardMoves(r,c,p,b);break;case'e':m=getElephantMoves(r,c,p,b);break;case'h':m=getHorseMoves(r,c,p,b);break;case'r':m=getRookMoves(r,c,p,b);break;case'c':m=getCannonMoves(r,c,p,b);break;case'p':m=getPawnMoves(r,c,p,b)}return m.filter(v=>{const[R,C]=v;const B=JSON.parse(JSON.stringify(b));B[R][C]=B[r][c];B[r][c]=null;return!isInCheck(PIECES[p].color,B)})}
+    function isOwnPiece(r,c,o,b){const p=b[r][c];return p&&PIECES[p].color===o}
+    function isOpponentPiece(r,c,o,b){const p=b[r][c];return p&&PIECES[p].color!==o}
+    function getKingMoves(r,c,p,b){const m=[],o=PIECES[p].color,a=o==='red'?[[7,3],[9,5]]:[[0,3],[2,5]];[[-1,0],[1,0],[0,-1],[0,1]].forEach(([R,C])=>{const n=r+R,e=c+C;n>=a[0][0]&&n<=a[1][0]&&e>=a[0][1]&&e<=a[1][1]&&!isOwnPiece(n,e,o,b)&&m.push([n,e])});const O=findKing(o==='red'?'black':'red',b);if(O&&O.c===c){let B=!1;for(let i=Math.min(r,O.r)+1;i<Math.max(r,O.r);i++)if(b[i][c]){B=!0;break}B||m.push([O.r,O.c])}return m}
+    function getGuardMoves(r,c,p,b){const m=[],o=PIECES[p].color,a=o==='red'?[[7,3],[9,5]]:[[0,3],[2,5]];[[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([R,C])=>{const n=r+R,e=c+C;n>=a[0][0]&&n<=a[1][0]&&e>=a[0][1]&&e<=a[1][1]&&!isOwnPiece(n,e,o,b)&&m.push([n,e])});return m}
+    function getElephantMoves(r,c,p,b){const m=[],o=PIECES[p].color,a=o==='red'?4:5;[[-2,-2],[-2,2],[2,-2],[2,2]].forEach(([R,C])=>{const n=r+R,e=c+C,k=r+R/2,i=c+C/2;n>=0&&n<10&&e>=0&&e<9&&((o==='red'&&n>a)||(o==='black'&&n<a))&&!b[k][i]&&!isOwnPiece(n,e,o,b)&&m.push([n,e])});return m}
+    function getHorseMoves(r,c,p,b){const m=[],o=PIECES[p].color;[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([R,C])=>{const n=r+R,e=c+C,k=r+(Math.abs(R)===2?R/2:0),i=c+(Math.abs(C)===2?C/2:0);n>=0&&n<10&&e>=0&&e<9&&!b[k][i]&&!isOwnPiece(n,e,o,b)&&m.push([n,e])});return m}
+    function getRookMoves(r,c,p,b){const m=[],o=PIECES[p].color;[[-1,0],[1,0],[0,-1],[0,1]].forEach(([R,C])=>{for(let i=1;i<10;i++){const n=r+R*i,e=c+C*i;if(n<0||n>9||e<0||e>8)break;if(b[n][e]){isOpponentPiece(n,e,o,b)&&m.push([n,e]);break}m.push([n,e])}});return m}
+    function getCannonMoves(r,c,p,b){const m=[],o=PIECES[p].color;[[-1,0],[1,0],[0,-1],[0,1]].forEach(([R,C])=>{let j=!1;for(let i=1;i<10;i++){const n=r+R*i,e=c+C*i;if(n<0||n>9||e<0||e>8)break;if(j){if(b[n][e]){isOpponentPiece(n,e,o,b)&&m.push([n,e]);break}}else if(b[n][e])j=!0;else m.push([n,e])}});return m}
+    function getPawnMoves(r,c,p,b){const m=[],o=PIECES[p].color,a=o==='red'?-1:1,k=o==='red'?4:5,n=r+a;n>=0&&n<10&&!isOwnPiece(n,c,o,b)&&m.push([n,c]);if((o==='red'&&r<=k)||(o==='black'&&r>=k))[-1,1].forEach(C=>{const e=c+C;e>=0&&e<9&&!isOwnPiece(r,e,o,b)&&m.push([r,e])});return m}
+    function findKing(o,b){const p=o==='red'?'K':'k';for(let r=0;r<10;r++)for(let c=0;c<9;c++)if(b[r][c]===p)return{r,c};return null}
+    function isInCheck(o,b){const a=findKing(o,b);if(!a)return!0;const k=o==='red'?'black':'red';for(let r=0;r<10;r++)for(let c=0;c<9;c++){const p=b[r][c];if(p&&PIECES[p].color===k){const m=getRawValidMoves(r,c,p,b);if(m.some(v=>v[0]===a.r&&v[1]===a.c))return!0}}return!1}
+    function getRawValidMoves(r,c,p,b){const t=p.toLowerCase();switch(t){case'k':return getKingMoves(r,c,p,b);case'g':return getGuardMoves(r,c,p,b);case'e':return getElephantMoves(r,c,p,b);case'h':return getHorseMoves(r,c,p,b);case'r':return getRookMoves(r,c,p,b);case'c':return getCannonMoves(r,c,p,b);case'p':return getPawnMoves(r,c,p,b)}return[]}
+    function hasAnyValidMoves(o,b){for(let r=0;r<10;r++)for(let c=0;c<9;c++){const p=b[r][c];if(p&&PIECES[p].color===o&&getValidMoves(r,c,p,b).length>0)return!0}return!1}
+
+    resetButton.addEventListener('click', initGame);
+    initGame();
+</script>
+
+</body>
+</html>
+
