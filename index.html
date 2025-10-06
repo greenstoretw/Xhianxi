@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>象棋 (AI建議版)</title>
+    <title>象棋 (極簡版)</title>
     <style>
         body { 
             font-family: sans-serif; 
@@ -11,25 +11,14 @@
             flex-direction: column;
             align-items: center; 
             padding: 10px;
-            background-color: #f0f0f0;
-        }
-        .container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background-color: white;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
         #info-panel {
             font-size: 1.2em;
             font-weight: bold;
-            margin-bottom: 10px;
+            margin: 10px;
             padding: 8px 16px;
             border-radius: 5px;
             color: white;
-            transition: background-color 0.3s;
         }
         .board-container {
             border: 2px solid black;
@@ -39,15 +28,14 @@
             background-color: #f3dcb6;
         }
         .board-table td {
-            width: 38px;
-            height: 38px;
+            width: 35px;
+            height: 35px;
             border: 1px solid #a16207;
             text-align: center;
             vertical-align: middle;
-            font-size: 26px;
+            font-size: 24px;
             font-weight: bold;
             cursor: pointer;
-            position: relative;
         }
         .river {
             height: 40px;
@@ -55,90 +43,54 @@
             letter-spacing: 0.5em;
             background-color: #eaddc3;
         }
-        .piece.red { color: #d90429; }
+        .piece.red { color: #ef4444; }
         .piece.black { color: #1f2937; }
-
-        /* 狀態高亮 */
-        .selected { background-color: #fee242; }
-        .valid-move { background-color: #a7f3d0; }
-        .is-check .piece-span {
+        .selected { background-color: #fde047; }
+        .valid-move { background-color: #86efac; }
+        .is-check {
             border: 3px solid #dc2626 !important;
             border-radius: 50%;
-            display: inline-block;
-            width: 36px;
-            height: 36px;
-            line-height: 36px;
-            box-sizing: border-box;
         }
-        /* AI 建議高亮 */
-        .ai-suggest-from { background-color: #93c5fd; } /* Blue */
-        .ai-suggest-to { background-color: #c4b5fd; } /* Purple */
-
-        .action-buttons {
+        #reset-button {
             margin-top: 15px;
-            display: flex;
-            gap: 10px;
-        }
-        .action-buttons button {
             padding: 10px 20px;
             font-size: 1em;
             cursor: pointer;
-            border: none;
-            border-radius: 5px;
-            background-color: #4f46e5;
-            color: white;
-            transition: background-color 0.2s;
-        }
-        .action-buttons button:hover:not(:disabled) {
-            background-color: #4338ca;
-        }
-        .action-buttons button:disabled {
-            background-color: #a5b4fc;
-            cursor: not-allowed;
-        }
-        #ai-info {
-            margin-top: 10px;
-            padding: 8px;
-            min-height: 2.5em;
-            text-align: center;
-            color: #1e3a8a;
-            background-color: #e0e7ff;
-            border-radius: 5px;
-            width: 90%;
-            font-weight: bold;
         }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1 style="margin: 0; margin-bottom: 10px;">象棋 AI</h1>
-        <div id="info-panel"></div>
-        <div id="board-container"></div>
-        <div class="action-buttons">
-            <button id="reset-button">重新開始</button>
-            <button id="ai-suggestion-button" disabled>取得AI建議 (黑方)</button>
-        </div>
-        <div id="ai-info">輪到紅方時，AI按鈕將會停用。</div>
-    </div>
+    <h1 style="margin: 0;">象棋</h1>
+    <div id="info-panel"></div>
+    <div id="board-container"></div>
+    <button id="reset-button">重新開始</button>
 
 <script>
     const boardContainer = document.getElementById('board-container');
     const infoPanel = document.getElementById('info-panel');
     const resetButton = document.getElementById('reset-button');
-    const aiSuggestionButton = document.getElementById('ai-suggestion-button');
-    const aiInfo = document.getElementById('ai-info');
 
-    // --- Gemini API ---
-    const API_KEY = ""; // Canvas 將會自動提供金鑰
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
-    
     const PIECES = {
-        'k':{name:'將',color:'black'},'g':{name:'士',color:'black'},'e':{name:'象',color:'black'},'h':{name:'馬',color:'black'},'r':{name:'車',color:'black'},'c':{name:'包',color:'black'},'p':{name:'卒',color:'black'},
-        'K':{name:'帥',color:'red'},'G':{name:'仕',color:'red'},'E':{name:'相',color:'red'},'H':{name:'馬',color:'red'},'R':{name:'俥',color:'red'},'C':{name:'炮',color:'red'},'P':{name:'兵',color:'red'}
+        'k': { name: '將', color: 'black' }, 'g': { name: '士', color: 'black' }, 'e': { name: '象', color: 'black' },
+        'h': { name: '馬', color: 'black' }, 'r': { name: '車', color: 'black' }, 'c': { name: '包', color: 'black' },
+        'p': { name: '卒', color: 'black' },
+        'K': { name: '帥', color: 'red' },   'G': { name: '仕', color: 'red' },   'E': { name: '相', color: 'red' },
+        'H': { name: '馬', color: 'red' },   'R': { name: '俥', color: 'red' },   'C': { name: '炮', color: 'red' },
+        'P': { name: '兵', color: 'red' }
     };
+
     const initialBoard = [
-        ['r','h','e','g','k','g','e','h','r'],[null,null,null,null,null,null,null,null,null],[null,'c',null,null,null,null,null,'c',null],['p',null,'p',null,'p',null,'p',null,'p'],[null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null],['P',null,'P',null,'P',null,'P',null,'P'],[null,'C',null,null,null,null,null,'C',null],[null,null,null,null,null,null,null,null,null],['R','H','E','G','K','G','E','H','R']
+        ['r', 'h', 'e', 'g', 'k', 'g', 'e', 'h', 'r'],
+        [null, null, null, null, null, null, null, null, null],
+        [null, 'c', null, null, null, null, null, 'c', null],
+        ['p', null, 'p', null, 'p', null, 'p', null, 'p'],
+        [null, null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null, null],
+        ['P', null, 'P', null, 'P', null, 'P', null, 'P'],
+        [null, 'C', null, null, null, null, null, 'C', null],
+        [null, null, null, null, null, null, null, null, null],
+        ['R', 'H', 'E', 'G', 'K', 'G', 'E', 'H', 'R']
     ];
 
     let board = [];
@@ -146,7 +98,6 @@
     let selectedPiece = null;
     let validMoves = [];
     let isGameOver = false;
-    let aiSuggestion = null;
 
     function initGame() {
         board = JSON.parse(JSON.stringify(initialBoard));
@@ -154,7 +105,6 @@
         selectedPiece = null;
         validMoves = [];
         isGameOver = false;
-        aiSuggestion = null;
         renderBoard();
         updateInfoPanel();
     }
@@ -164,6 +114,7 @@
         table.className = 'board-table';
 
         for (let r = 0; r < 10; r++) {
+            // 插入楚河漢界
             if (r === 5) {
                 let riverRow = table.insertRow();
                 let riverCell = riverRow.insertCell();
@@ -171,6 +122,7 @@
                 riverCell.className = 'river';
                 riverCell.innerHTML = '楚 河 漢 界';
             }
+
             let row = table.insertRow();
             for (let c = 0; c < 9; c++) {
                 let cell = row.insertCell();
@@ -178,28 +130,34 @@
                 cell.dataset.c = c;
                 
                 const pieceId = board[r][c];
+                const pieceSpan = document.createElement('span');
+
                 if (pieceId) {
                     const pieceInfo = PIECES[pieceId];
-                    const pieceSpan = document.createElement('span');
-                    pieceSpan.className = 'piece-span';
                     pieceSpan.textContent = pieceInfo.name;
-                    cell.className += ` piece ${pieceInfo.color}`;
+                    pieceSpan.className = `piece ${pieceInfo.color}`;
 
-                    if (pieceId.toLowerCase() === 'k' && isInCheck(pieceInfo.color, board)) {
-                        cell.classList.add('is-check');
+                    // 標示被將軍的將/帥
+                    const kingPos = findKing(pieceInfo.color, board);
+                    if (kingPos && pieceId.toLowerCase() === 'k' && isInCheck(pieceInfo.color, board)) {
+                        pieceSpan.classList.add('is-check');
                     }
                     cell.appendChild(pieceSpan);
                 } else {
-                    cell.innerHTML = '┼';
+                    cell.innerHTML = '┼'; // 用符號表示交叉點
                     cell.style.color = '#c9ab81';
                 }
 
-                if (selectedPiece && selectedPiece.r === r && selectedPiece.c === c) cell.classList.add('selected');
-                if (validMoves.some(move => move[0] === r && move[1] === c)) cell.classList.add('valid-move');
-                if (aiSuggestion) {
-                    if (aiSuggestion.from[0] === r && aiSuggestion.from[1] === c) cell.classList.add('ai-suggest-from');
-                    if (aiSuggestion.to[0] === r && aiSuggestion.to[1] === c) cell.classList.add('ai-suggest-to');
+                // 標示選中的棋子
+                if (selectedPiece && selectedPiece.r === r && selectedPiece.c === c) {
+                    cell.classList.add('selected');
                 }
+
+                // 標示可移動位置
+                if (validMoves.some(move => move[0] === r && move[1] === c)) {
+                    cell.classList.add('valid-move');
+                }
+
                 cell.addEventListener('click', () => onSquareClick(r, c));
             }
         }
@@ -209,12 +167,12 @@
 
     function onSquareClick(r, c) {
         if (isGameOver) return;
-        aiSuggestion = null; // 點擊後清除AI建議高亮
 
         if (selectedPiece && validMoves.some(move => move[0] === r && move[1] === c)) {
             movePiece(selectedPiece.r, selectedPiece.c, r, c);
             return;
         }
+
         const pieceId = board[r][c];
         if (pieceId && PIECES[pieceId].color === currentPlayer) {
             selectedPiece = { r, c, id: pieceId, info: PIECES[pieceId] };
@@ -244,19 +202,28 @@
         if (isInCheck(currentPlayer, board)) {
             infoPanel.textContent += ' (將軍！)';
         }
+    }
 
-        if (currentPlayer === 'black' && !isGameOver) {
-            aiSuggestionButton.disabled = false;
-            aiInfo.textContent = '可以請求 AI 提供黑方建議。';
-        } else {
-            aiSuggestionButton.disabled = true;
-            if (!isGameOver) {
-                aiInfo.textContent = '輪到紅方時，AI按鈕將會停用。';
-            }
+    function checkGameState() {
+        if (!hasAnyValidMoves(currentPlayer, board)) {
+            isGameOver = true;
+            const opponentColor = currentPlayer === 'red' ? 'black' : 'red';
+            const opponentName = opponentColor === 'red' ? '紅方' : '黑方';
+            const currentPlayerName = currentPlayer === 'red' ? '紅方' : '黑方';
+            const reason = isInCheck(currentPlayer, board) ? '將死' : '困斃';
+            const message = reason === '將死' 
+                ? `${opponentName}獲勝！ (${reason})` 
+                : `和棋！ (${currentPlayerName}${reason})`;
+            
+            // 使用內建的 alert，最簡單可靠
+            setTimeout(() => {
+                alert(message);
+                infoPanel.textContent = "遊戲結束";
+            }, 100);
         }
     }
-    
-    function checkGameState(){if(!hasAnyValidMoves(currentPlayer,board)){isGameOver=!0;const e=currentPlayer==="red"?"black":"red",t=e==="red"?"紅方":"黑方",a=currentPlayer==="red"?"紅方":"黑方",n=isInCheck(currentPlayer,board)?"將死":"困斃",o="將死"===n?`${t}獲勝！ (${n})`:`和棋！ (${a}${n})`;setTimeout(()=>{alert(o),infoPanel.textContent="遊戲結束",aiInfo.textContent="遊戲結束。"},100)}}
+
+    // --- 所有移動規則和判斷邏輯 (與之前版本相同) ---
     function getValidMoves(r,c,p,b){const t=p.toLowerCase();let m=[];switch(t){case'k':m=getKingMoves(r,c,p,b);break;case'g':m=getGuardMoves(r,c,p,b);break;case'e':m=getElephantMoves(r,c,p,b);break;case'h':m=getHorseMoves(r,c,p,b);break;case'r':m=getRookMoves(r,c,p,b);break;case'c':m=getCannonMoves(r,c,p,b);break;case'p':m=getPawnMoves(r,c,p,b)}return m.filter(v=>{const[R,C]=v;const B=JSON.parse(JSON.stringify(b));B[R][C]=B[r][c];B[r][c]=null;return!isInCheck(PIECES[p].color,B)})}
     function isOwnPiece(r,c,o,b){const p=b[r][c];return p&&PIECES[p].color===o}
     function isOpponentPiece(r,c,o,b){const p=b[r][c];return p&&PIECES[p].color!==o}
@@ -271,90 +238,8 @@
     function isInCheck(o,b){const a=findKing(o,b);if(!a)return!0;const k=o==='red'?'black':'red';for(let r=0;r<10;r++)for(let c=0;c<9;c++){const p=b[r][c];if(p&&PIECES[p].color===k){const m=getRawValidMoves(r,c,p,b);if(m.some(v=>v[0]===a.r&&v[1]===a.c))return!0}}return!1}
     function getRawValidMoves(r,c,p,b){const t=p.toLowerCase();switch(t){case'k':return getKingMoves(r,c,p,b);case'g':return getGuardMoves(r,c,p,b);case'e':return getElephantMoves(r,c,p,b);case'h':return getHorseMoves(r,c,p,b);case'r':return getRookMoves(r,c,p,b);case'c':return getCannonMoves(r,c,p,b);case'p':return getPawnMoves(r,c,p,b)}return[]}
     function hasAnyValidMoves(o,b){for(let r=0;r<10;r++)for(let c=0;c<9;c++){const p=b[r][c];if(p&&PIECES[p].color===o&&getValidMoves(r,c,p,b).length>0)return!0}return!1}
-    
-    // --- AI 功能 ---
-    function formatBoardForAI(boardState) {
-        let boardString = "  0 1 2 3 4 5 6 7 8 (c)\n";
-        boardState.forEach((row, r) => {
-            boardString += `${r} ` + row.map(p => p === null ? '.' : p).join(' ') + '\n';
-        });
-        return boardString;
-    }
-
-    async function getAISuggestion() {
-        if (currentPlayer !== 'black' || isGameOver) return;
-
-        aiSuggestionButton.disabled = true;
-        aiInfo.textContent = 'AI 思考中，請稍候...';
-        aiSuggestion = null;
-        renderBoard(); // 清除舊的高亮
-
-        const formattedBoard = formatBoardForAI(board);
-        const systemPrompt = "你是一位象棋大師。請根據目前的棋盤狀態，為黑方建議最好的一步棋。";
-        const userQuery = `這是目前的棋盤狀態 (r=車, h=馬, e=象, g=士, k=將, c=炮, p=卒; R=俥, H=傌, E=相, G=仕, K=帥, C=炮, P=兵; '.' 代表空格):\n\n${formattedBoard}\n現在輪到黑方 (black) 行棋。\n\n請分析盤面後，找出對黑方最有利的一步，並只用指定的 JSON 格式回覆。`;
-        
-        const payload = {
-            contents: [{ parts: [{ text: userQuery }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: "OBJECT",
-                    properties: {
-                        "from": { "type": "ARRAY", "items": { "type": "NUMBER" } },
-                        "to": { "type": "ARRAY", "items": { "type": "NUMBER" } },
-                        "reason": { "type": "STRING" }
-                    },
-                    required: ["from", "to", "reason"]
-                }
-            }
-        };
-
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                throw new Error(`API 請求失敗，狀態碼: ${response.status}`);
-            }
-
-            const result = await response.json();
-            const text = result.candidates[0].content.parts[0].text;
-            const suggestion = JSON.parse(text);
-
-            // 驗證AI的回應是否合法
-            const [fromR, fromC] = suggestion.from;
-            const [toR, toC] = suggestion.to;
-            const pieceId = board[fromR][fromC];
-
-            if (pieceId && PIECES[pieceId].color === 'black') {
-                const legalMoves = getValidMoves(fromR, fromC, pieceId, board);
-                if (legalMoves.some(move => move[0] === toR && move[1] === toC)) {
-                    aiSuggestion = { from: [fromR, fromC], to: [toR, toC] };
-                    aiInfo.textContent = `AI 建議: ${suggestion.reason}`;
-                    renderBoard();
-                } else {
-                    throw new Error('AI 建議了一個不合法的走法。');
-                }
-            } else {
-                throw new Error('AI 建議移動一個不存在或不屬於黑方的棋子。');
-            }
-
-        } catch (error) {
-            console.error("AI 建議出錯:", error);
-            aiInfo.textContent = '無法取得AI建議，請稍後再試。';
-        } finally {
-            if (!isGameOver) {
-                aiSuggestionButton.disabled = false;
-            }
-        }
-    }
 
     resetButton.addEventListener('click', initGame);
-    aiSuggestionButton.addEventListener('click', getAISuggestion);
     initGame();
 </script>
 
